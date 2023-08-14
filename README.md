@@ -10,7 +10,7 @@ w64devkit variant.
 
 Unlike the upstream makefiles, parallel builds work properly. This build
 is configured specifically for w64devkit and is not designed for use in
-other environments, not even cross-compilation.
+other environments.
 
 ## Features and invocation
 
