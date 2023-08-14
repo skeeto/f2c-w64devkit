@@ -1,4 +1,5 @@
 CC      = gcc
+AR      = ar
 CFLAGS  = -Os -g -DMSDOS -DNO_MKDTEMP -DNO_TEMPDIR
 LDFLAGS = -s
 
@@ -55,7 +56,7 @@ f2c.exe: $(src_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^
 
 libf2c.a: $(lib_OBJ)
-	ar r libf2c.a $?
+	$(AR) r libf2c.a $?
 
 f2c.h: lib/f2c.h
 	cp $^ $@
