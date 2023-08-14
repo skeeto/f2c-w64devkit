@@ -1,0 +1,2 @@
+char F2C_version[] = "20230428";
+char xxxvers[] = "\n@(#) FORTRAN 77 to C Translator, VERSION 20230428\n";
