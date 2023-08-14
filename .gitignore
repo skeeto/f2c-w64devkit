@@ -1,0 +1,8 @@
+*.a
+*.exe
+*.o
+f2c.h
+lib/arith.h
+lib/signal1.h
+lib/sysdep1.h
+src/sysdep.hd
