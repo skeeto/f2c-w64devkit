@@ -9,6 +9,11 @@ install: f2c.exe libf2c.a f2c.h
 	cp libf2c.a "$$W64DEVKIT_HOME"/$$(gcc -dumpmachine)/lib/
 	cp f2c.h    "$$W64DEVKIT_HOME"/$$(gcc -dumpmachine)/include/
 
+uninstall:
+	rm -f "$$W64DEVKIT_HOME"/bin/f2c.exe \
+	      "$$W64DEVKIT_HOME"/$$(gcc -dumpmachine)/lib/libf2c.a \
+	      "$$W64DEVKIT_HOME"/$$(gcc -dumpmachine)/include/f2c.h
+
 src_OBJx = \
   main.o init.o gram.o lex.o proc.o equiv.o data.o format.o expr.o     \
   exec.o intr.o io.o misc.o error.o mem.o names.o output.o p1output.o  \
