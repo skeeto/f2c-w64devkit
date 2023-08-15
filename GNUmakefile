@@ -1,6 +1,6 @@
 CC      = gcc
 AR      = ar
-CFLAGS  = -Os -g -DMSDOS -DNO_MKDTEMP -DNO_TEMPDIR
+CFLAGS  = -O2 -g -DMSDOS -DNO_MKDTEMP -DNO_TEMPDIR
 LDFLAGS = -s
 
 all: f2c.exe libf2c.a f2c.h
@@ -43,7 +43,6 @@ lib_OBJx = \
   rsli.o rsne.o sfe.o sue.o typesize.o uio.o util.o wref.o wrtfmt.o wsfe.o \
   wsle.o wsne.o xwsne.o pow_qq.o qbitbits.o qbitshft.o ftell64_.o dtime_.o \
   etime_.o
-
 lib_OBJ = $(addprefix lib/,$(lib_OBJx))
 
 src/%.o: src/%.c
@@ -56,7 +55,7 @@ f2c.exe: $(src_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^
 
 libf2c.a: $(lib_OBJ)
-	$(AR) r libf2c.a $?
+	$(AR) r libf2c.a $^
 
 f2c.h: lib/f2c.h
 	cp $^ $@
