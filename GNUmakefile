@@ -49,7 +49,7 @@ src/%.o: src/%.c
 	$(CC) -c -o $@ $(CFLAGS) $<
 
 lib/%.o: lib/%.c
-	$(CC) -c -o $@ $(CFLAGS) -DSkip_f2c_Undefs $<
+	$(CC) -c -o $@ $(CFLAGS) -DAllow_TYQUAD -DSkip_f2c_Undefs $<
 
 f2c.exe: $(src_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^
