@@ -61,11 +61,8 @@ warn(char *s)
 {
 	if(nowarnflag)
 		return;
-	if (infname && *infname)
-		fprintf(diagfile, "Warning on line %ld of %s: %s\n",
-			lineno, infname, s);
-	else
-		fprintf(diagfile, "Warning on line %ld: %s\n", lineno, s);
+	fprintf(diagfile, "%s:%ld: warning: %s\n",
+		infname&&*infname?infname:"<stdin>", lineno, s);
 	fflush(diagfile);
 	++nwarn;
 }
@@ -123,15 +120,9 @@ err(s)
 err(char *s)
 #endif
 {
-	if (err_proc)
-		fprintf(diagfile,
-			"Error processing %s before line %ld",
-			err_proc, lineno);
-	else
-		fprintf(diagfile, "Error on line %ld", lineno);
-	if (infname && *infname)
-		fprintf(diagfile, " of %s", infname);
-	fprintf(diagfile, ": %s\n", s);
+	fprintf(diagfile, "%s:%ld: error:%s%s %s\n",
+		infname&&*infname?infname:"<stdin>",
+		lineno, err_proc?" in ":"", err_proc?err_proc:"", s);
 	fflush(diagfile);
 	++nerr;
 }
