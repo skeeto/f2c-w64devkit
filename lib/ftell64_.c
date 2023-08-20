@@ -6,9 +6,9 @@ extern "C" {
 
  static FILE *
 #ifdef KR_headers
-unit_chk(Unit, who) integer Unit; char *who;
+unit_chk64(Unit, who) integer Unit; char *who;
 #else
-unit_chk(integer Unit, char *who)
+unit_chk64(integer Unit, char *who)
 #endif
 {
 	if (Unit >= MXUNIT || Unit < 0)
@@ -24,7 +24,7 @@ ftell64_(integer *Unit)
 #endif
 {
 	FILE *f;
-	return (f = unit_chk(*Unit, "ftell")) ? FTELL(f) : -1L;
+	return (f = unit_chk64(*Unit, "ftell")) ? FTELL(f) : -1L;
 	}
 
  int
@@ -44,7 +44,7 @@ fseek64_(integer *Unit, longint *offset, integer *whence)
 #ifdef SEEK_SET
 	w = wohin[w];
 #endif
-	return	!(f = unit_chk(*Unit, "fseek"))
+	return	!(f = unit_chk64(*Unit, "fseek"))
 		|| FSEEK(f, (OFF_T)*offset, w) ? 1 : 0;
 	}
 #ifdef __cplusplus

@@ -497,9 +497,9 @@ r8fix(Void)	/* adjust tables for -r8 */
 
  static expptr
 #ifdef KR_headers
-foldminmax(ismin, argsp) int ismin; struct Listblock *argsp;
+foldminmax2(ismin, argsp) int ismin; struct Listblock *argsp;
 #else
-foldminmax(int ismin, struct Listblock *argsp)
+foldminmax2(int ismin, struct Listblock *argsp)
 #endif
 {
 #ifndef NO_LONG_LONG
@@ -896,7 +896,7 @@ specfunct:
 			goto badtype;
 		argsp->vtype = mtype;
 		if (constargs)
-			q = foldminmax(f1field==INTRMIN, argsp);
+			q = foldminmax2(f1field==INTRMIN, argsp);
 		else
 			q = mkexpr(f1field==INTRMIN ? OPMIN : OPMAX,
 					(expptr)argsp, ENULL);

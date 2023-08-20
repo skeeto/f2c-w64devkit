@@ -30,11 +30,11 @@ extern integer f_clos(cllist*);
 #endif
 
 #ifdef NON_ANSI_RW_MODES
-Const char *f__r_mode[2] = {"r", "r"};
-Const char *f__w_mode[4] = {"w", "w", "r+w", "r+w"};
+char *f__r_mode[2] = {"r", "r"};
+char *f__w_mode[4] = {"w", "w", "r+w", "r+w"};
 #else
-Const char *f__r_mode[2] = {"rb", "r"};
-Const char *f__w_mode[4] = {"wb", "w", "r+b", "r+"};
+char *f__r_mode[2] = {"rb", "r"};
+char *f__w_mode[4] = {"wb", "w", "r+b", "r+"};
 #endif
 
  static char f__buf0[400], *f__buf = f__buf0;

@@ -1904,9 +1904,9 @@ putcall(expptr p0, Addrp *temp)
 
  static expptr
 #ifdef KR_headers
-foldminmax(op, type, p) int op; int type; chainp p;
+foldminmax3(op, type, p) int op; int type; chainp p;
 #else
-foldminmax(int op, int type, chainp p)
+foldminmax3(int op, int type, chainp p)
 #endif
 {
 	Constp c, c1;
@@ -2007,7 +2007,7 @@ putmnmx(register expptr p)
 	for(p1 = p0;; p1 = p1->nextp) {
 		if (!p1) {
 			/* all constants */
-			p = foldminmax(op, type, p0);
+			p = foldminmax3(op, type, p0);
 			frchain(&p0);
 			return p;
 			}

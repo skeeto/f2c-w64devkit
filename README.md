@@ -27,6 +27,24 @@ features only apply to the underlying C source.
 
 `-fcommon` is required when translation units share a `COMMON` block.
 
+## Source amalgamation
+
+This fork features a source amalgamation of both compiler, `f2c.c`, and
+runtime, `libf2c.c`. Either is trivially compiled without a build system.
+Even more, the runtime can now be embedded into the same translation unit
+as the compiled FORTRAN, producing more optimal code, particularly when
+compiled with `-fwhole-program`. Because the runtime compiles faster than
+it links, it even *builds* faster as a unity build. Without a pre-compiled
+runtime, the `f2c.h` configuration is also more easily changed on the fly.
+
+    $ make f2c.c libf2c.c f2c.h
+
+The catch is that f2c has egregious namespace hygiene. There is no rhyme
+or reason behind its choice of identifiers, and it clashes with reserved
+identifiers (e.g. in `math.h`). Even under conventional circumstances it
+can be problematic, but it's worse when all in a single namespace. Though,
+for similar reasons, this has revealed new f2c bugs.
+
 
 [f2c]: https://netlib.org/f2c/
 [FORTRAN 77]: https://www.star.le.ac.uk/~cgp/prof77.pdf
