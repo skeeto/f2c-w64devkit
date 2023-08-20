@@ -1,6 +1,6 @@
 CC      = gcc
 AR      = ar
-CFLAGS  = -O2 -g -DMSDOS -DNO_MKDTEMP -DNO_TEMPDIR
+CFLAGS  = -O2 -g -DMSDOS -DNO_MKDTEMP -DNO_TEMPDIR -DGCC_COMPARE_BUG_FIXED
 LDFLAGS = -s
 
 all: f2c.exe libf2c.a f2c.h
