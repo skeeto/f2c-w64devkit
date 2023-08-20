@@ -1,6 +1,6 @@
 CC      = gcc
 AR      = ar
-CFLAGS  = -O2 -g -DMSDOS -DNO_MKDTEMP -DNO_TEMPDIR -DGCC_COMPARE_BUG_FIXED
+CFLAGS  = -O2 -g
 LDFLAGS = -s
 
 all: f2c.exe libf2c.a f2c.h
@@ -46,10 +46,10 @@ lib_OBJx = \
 lib_OBJ = $(addprefix lib/,$(lib_OBJx))
 
 src/%.o: src/%.c
-	$(CC) -c -o $@ $(CFLAGS) $<
+	$(CC) -c -o $@ $(CFLAGS) -DMSDOS -DNO_MKDTEMP -DNO_TEMPDIR $<
 
 lib/%.o: lib/%.c
-	$(CC) -c -o $@ $(CFLAGS) -DAllow_TYQUAD -DSkip_f2c_Undefs $<
+	$(CC) -c -o $@ $(CFLAGS) -DMSDOS -DAllow_TYQUAD -DGCC_COMPARE_BUG_FIXED $<
 
 f2c.exe: $(src_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^
