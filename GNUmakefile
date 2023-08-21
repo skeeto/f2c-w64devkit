@@ -123,5 +123,6 @@ libf2c.c: libf2ctop.h $(addprefix lib/,$(libf2c_SRC))
 	  sed -r '/#undef (abs|min|max)/d' >$@
 
 clean:
-	rm -f $(src_OBJ) $(lib_OBJ) f2c.exe libf2c.a f2c.h f2c.c libf2c.c \
+	rm -f $(src_OBJ) $(lib_OBJ) \
+	      f2c.exe libf2c.a f2c.h f77.exe f2c.c libf2c.c \
 	      src/sysdep.hd lib/f2c.h lib/signal1.h lib/sysdep1.h lib/arith.h
