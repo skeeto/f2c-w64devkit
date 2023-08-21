@@ -327,8 +327,9 @@ static i32 f77main(i32 argc, c16 **argv)
         return FATAL(err, "out of memory");
     }
 
-    arglist *libs  = 0, **lastlib  = &libs;
-    arglist *files = 0, **lastfile = &files;
+    arglist *inputs  = 0, **lastinput  = &inputs;
+    arglist *outputs = 0, **lastoutput = &outputs;
+    arglist *libs    = 0, **lastlib    = &libs;
 
     c16 *cmd_f2c = L"f2c";
     c16 *cmd_cc  = L"cc";
@@ -356,10 +357,10 @@ static i32 f77main(i32 argc, c16 **argv)
     for (; optind < argc; optind++) {
         c16 *arg = argv[optind];
         if (stopargs || *arg != '-') {
-            arglist *file = NEW(perm, 1, arglist);
-            file->arg = arg;
-            *lastfile = file;
-            lastfile = &file->next;
+            arglist *input = NEW(perm, 1, arglist);
+            input->arg = arg;
+            *lastinput = input;
+            lastinput = &input->next;
         } else if (matches(arg, (u8 *)"--")) {
             stopargs = 1;
         } else if (begins(arg, (u8 *)"-C")) {
@@ -439,7 +440,7 @@ static i32 f77main(i32 argc, c16 **argv)
         }
     }
 
-    if (!files) {
+    if (!inputs) {
         return FATAL(err, "no input files");
     }
 
@@ -448,17 +449,17 @@ static i32 f77main(i32 argc, c16 **argv)
     *lastlib = NEW(perm, 1, arglist);
     (*lastlib)->arg = L"-lf2c";
 
-    si si = {0};
-    si.cb = sizeof(si);
-    for (arglist *file = files; file; file = file->next) {
-        c16 *arg = file->arg;
+    u32 status = 0;
+    for (arglist *input = inputs; input; input = input->next) {
+        c16 *arg = input->arg;
         c16 *cpath = makecpath(perm, arg);
 
         c16buf cmd = *f2c;
         appendarg(&cmd, arg);
         appendc16(&cmd, 0);
         if (cmd.err) {
-            return FATAL(err, "f2c command too long");
+            status = FATAL(err, "f2c command too long");
+            break;
         }
         if (verbose) {
             cmd.buf[cmd.len-1] = '\n';
@@ -466,61 +467,75 @@ static i32 f77main(i32 argc, c16 **argv)
             cmd.buf[cmd.len-1] = 0;
         }
 
+        si si = {0};
+        si.cb = sizeof(si);
         pi pi;
-        i32 r = CreateProcessW(0, cmd.buf, 0, 0, 1, 0, 0, 0, &si, &pi);
-        if (!r) {
-            return FATAL(err, "could not exec f2c");
+        if (!CreateProcessW(0, cmd.buf, 0, 0, 1, 0, 0, 0, &si, &pi)) {
+            status = FATAL(err, "could not exec f2c");
+            break;
         }
-        u32 ret;
         WaitForSingleObject(pi.process, -1);
-        GetExitCodeProcess(pi.process, &ret);
-        if (ret) {
-            if (!keep && cpath) DeleteFileW(cpath);
-            return ret;
-        }
+        GetExitCodeProcess(pi.process, &status);
         CloseHandle(pi.thread);
         CloseHandle(pi.process);
+        if (status) {
+            break;
+        }
 
         // f2c probably complained already, but double check
         if (!cpath) {
-            return FATAL(err, "could not guess .c filename");
+            APPEND(err, L"could not guess .c filename: ");
+            appendstr(err, arg);
+            status = FATAL(err, "");
+            break;
         }
+        appendarg(cc, cpath);
+        arglist *output = NEW(perm, 1, arglist);
+        output->arg = cpath;
+        *lastoutput = output;
+        lastoutput = &output->next;
+    }
 
-        cmd = *cc;
-        appendarg(&cmd, cpath);
+    while (!status) {
         if (dolink) {
             for (arglist *lib = libs; lib; lib = lib->next) {
-                appendarg(&cmd, lib->arg);
+                appendarg(cc, lib->arg);
             }
         }
-        appendc16(&cmd, 0);
-        if (cmd.err) {
-            if (!keep) DeleteFileW(cpath);
-            return FATAL(err, "cc command too long");
+        appendc16(cc, 0);
+        if (cc->err) {
+            status = FATAL(err, "cc command too long");
+            break;
         }
         if (verbose) {
-            cmd.buf[cmd.len-1] = '\n';
-            safewrite(2, cmd.buf, cmd.len);
-            cmd.buf[cmd.len-1] = 0;
+            cc->buf[cc->len-1] = '\n';
+            safewrite(2, cc->buf, cc->len);
+            cc->buf[cc->len-1] = 0;
         }
 
-        r = CreateProcessW(0, cmd.buf, 0, 0, 1, 0, 0, 0, &si, &pi);
-        if (!r) {
-            if (!keep) DeleteFileW(cpath);
-            return FATAL(err, "could not exec cc");
+        si si = {0};
+        si.cb = sizeof(si);
+        pi pi;
+        if (CreateProcessW(0, cc->buf, 0, 0, 1, 0, 0, 0, &si, &pi)) {
+            WaitForSingleObject(pi.process, -1);
+            GetExitCodeProcess(pi.process, &status);
+            CloseHandle(pi.thread);
+            CloseHandle(pi.process);
+        } else {
+            status = FATAL(err, "could not exec cc");
         }
-        WaitForSingleObject(pi.process, -1);
-        GetExitCodeProcess(pi.process, &ret);
-        if (!keep) DeleteFileW(cpath);
-        if (ret) {
-            return ret;
-        }
-        CloseHandle(pi.thread);
-        CloseHandle(pi.process);
+        break;
     }
-    return 0;
+
+    if (!keep) {
+        for (arglist *output = outputs; output; output = output->next) {
+            DeleteFileW(output->arg);
+        }
+    }
+    return status;
 }
 
+__attribute((force_align_arg_pointer))
 void mainCRTStartup(void)
 {
     c16 *cmdline = GetCommandLineW();
