@@ -3,17 +3,19 @@ AR      = ar
 CFLAGS  = -O2 -g
 LDFLAGS = -s
 
-all: f2c.exe libf2c.a f2c.h f2c.c libf2c.c
+all: f2c.exe libf2c.a f2c.h f77.exe f2c.c libf2c.c
 
-install: f2c.exe libf2c.a f2c.h
+install: f2c.exe libf2c.a f2c.h f77.exe
 	cp f2c.exe  "$$W64DEVKIT_HOME"/bin/
 	cp libf2c.a "$$W64DEVKIT_HOME"/$$(gcc -dumpmachine)/lib/
 	cp f2c.h    "$$W64DEVKIT_HOME"/$$(gcc -dumpmachine)/include/
+	cp f77.exe  "$$W64DEVKIT_HOME"/bin/
 
 uninstall:
 	rm -f "$$W64DEVKIT_HOME"/bin/f2c.exe \
 	      "$$W64DEVKIT_HOME"/$$(gcc -dumpmachine)/lib/libf2c.a \
-	      "$$W64DEVKIT_HOME"/$$(gcc -dumpmachine)/include/f2c.h
+	      "$$W64DEVKIT_HOME"/$$(gcc -dumpmachine)/include/f2c.h \
+	      "$$W64DEVKIT_HOME"/bin/f2c.exe
 
 src_OBJx = \
   main.o init.o gram.o lex.o proc.o equiv.o data.o format.o expr.o     \
@@ -77,6 +79,9 @@ lib/signal1.h: lib/signal1.h0
 lib/uninit.o: lib/arith.h
 lib/arith.h:
 	echo >$@
+
+f77.exe: f77.c
+	$(CC) -nostartfiles -fno-builtin $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 f2c_SRC = \
   ftypes.h defines.h machdefs.h niceprintf.h sysdep.h defs.h format.h     \
