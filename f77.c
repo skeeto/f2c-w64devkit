@@ -453,6 +453,10 @@ static i32 f77main(i32 argc, c16 **argv)
     for (arglist *input = inputs; input; input = input->next) {
         c16 *arg = input->arg;
         c16 *cpath = makecpath(perm, arg);
+        if (!cpath) {
+            appendarg(cc, arg);
+            continue;
+        }
 
         c16buf cmd = *f2c;
         appendarg(&cmd, arg);
@@ -482,13 +486,6 @@ static i32 f77main(i32 argc, c16 **argv)
             break;
         }
 
-        // f2c probably complained already, but double check
-        if (!cpath) {
-            APPEND(err, L"could not guess .c filename: ");
-            appendstr(err, arg);
-            status = FATAL(err, "");
-            break;
-        }
         appendarg(cc, cpath);
         arglist *output = NEW(perm, 1, arglist);
         output->arg = cpath;
