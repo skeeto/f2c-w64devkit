@@ -452,6 +452,8 @@ static i32 f77main(i32 argc, c16 **argv)
     si.cb = sizeof(si);
     for (arglist *file = files; file; file = file->next) {
         c16 *arg = file->arg;
+        c16 *cpath = makecpath(perm, arg);
+
         c16buf cmd = *f2c;
         appendarg(&cmd, arg);
         appendc16(&cmd, 0);
@@ -473,13 +475,18 @@ static i32 f77main(i32 argc, c16 **argv)
         WaitForSingleObject(pi.process, -1);
         GetExitCodeProcess(pi.process, &ret);
         if (ret) {
+            if (!keep && cpath) DeleteFileW(cpath);
             return ret;
         }
         CloseHandle(pi.thread);
         CloseHandle(pi.process);
 
+        // f2c probably complained already, but double check
+        if (!cpath) {
+            return FATAL(err, "could not guess .c filename");
+        }
+
         cmd = *cc;
-        c16 *cpath = makecpath(perm, arg);
         appendarg(&cmd, cpath);
         if (dolink) {
             for (arglist *lib = libs; lib; lib = lib->next) {
@@ -488,6 +495,7 @@ static i32 f77main(i32 argc, c16 **argv)
         }
         appendc16(&cmd, 0);
         if (cmd.err) {
+            if (!keep) DeleteFileW(cpath);
             return FATAL(err, "cc command too long");
         }
         if (verbose) {
@@ -498,19 +506,17 @@ static i32 f77main(i32 argc, c16 **argv)
 
         r = CreateProcessW(0, cmd.buf, 0, 0, 1, 0, 0, 0, &si, &pi);
         if (!r) {
+            if (!keep) DeleteFileW(cpath);
             return FATAL(err, "could not exec cc");
         }
         WaitForSingleObject(pi.process, -1);
         GetExitCodeProcess(pi.process, &ret);
+        if (!keep) DeleteFileW(cpath);
         if (ret) {
             return ret;
         }
         CloseHandle(pi.thread);
         CloseHandle(pi.process);
-
-        if (!keep) {
-            DeleteFileW(cpath);  // do not report failure
-        }
     }
     return 0;
 }
