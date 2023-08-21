@@ -150,7 +150,43 @@ static void appendcmd(c16buf *dst, c16 *arg)
 static void appendarg(c16buf *dst, c16 *arg)
 {
     appendc16(dst, ' ');
-    appendstr(dst, arg);
+
+    bool simple = 1;
+    for (size i = 0; simple && arg[i]; i++) {
+        switch (arg[i]) {
+        case '\n': case ' ': case '"':
+            simple = 0;
+        }
+    }
+
+    if (simple) {
+        appendstr(dst, arg);
+        return;
+    }
+
+    size backslash = 0;
+    appendc16(dst, '"');
+    for (size i = 0; i < arg[i]; i++) {
+        switch (arg[i]) {
+        case '\\':
+            backslash++;
+            break;
+        case '"':
+            for (size i = 0; i < backslash; i++) {
+                appendc16(dst, '\\');
+            }
+            appendc16(dst, '\\');
+            backslash = 0;
+            break;
+        default:
+            backslash = 0;
+        }
+        appendc16(dst, arg[i]);
+    }
+    for (size i = 0; i < backslash; i++) {
+        appendc16(dst, '\\');
+    }
+    appendc16(dst, '"');
 }
 
 static bool matches(c16 *a, u8 *b)
