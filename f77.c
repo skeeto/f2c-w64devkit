@@ -1,16 +1,13 @@
 // f77 -- transparently invoke f2c and cc together (like fort77)
-// $ gcc -nostartfiles -fno-builtin -o f77.exe f77.c
-// $ f77 -Os -o example.exe example.f
-// $ f77 -shared -O2 -o example.dll example.f
+//   $ gcc -nostartfiles -fno-builtin -o f77.exe f77.c
+//   $ f77 -Os -o example.exe example.f
+//   $ f77 -shared -O2 -o example.dll example.f
+// Enable assertions with -fsanitize=undefined -fsanitize-trap
 // This is free and unencumbered software released into the public domain.
 
-#ifdef DEBUG
-#  define assert(c) if (!(c)) __builtin_trap()
-#else
-#  define assert(c) (void)sizeof(c)
-#endif
+#define assert(c) do if (!(c)) __builtin_unreachable(); while (0)
 
-typedef _Bool bool;
+typedef _Bool            bool;
 typedef unsigned char    byte;
 typedef __UINT8_TYPE__   u8;
 typedef __UINT16_TYPE__  u16;
@@ -18,72 +15,71 @@ typedef __UINT32_TYPE__  u32;
 typedef __INT32_TYPE__   i32;
 typedef __PTRDIFF_TYPE__ size;
 typedef __UINTPTR_TYPE__ uptr;
-typedef u16 char16_t;  // for GDB
-typedef char16_t c16;
+typedef u16              char16_t;  // for GDB
+typedef char16_t         c16;
 
-typedef struct { uptr h; } handle;
-typedef struct { uptr h; } *ign;
+typedef struct {} *handle;
+typedef struct {} *null;
+
 typedef struct {
   u32 cb;
-  ign a, b, c;
+  uptr a, b, c;
   i32 d, e, f, g, h, i, j, k;
   u16 l, m;
-  ign *n, *o, *p, *q;
+  uptr n, o, p, q;
 } si;
 
 typedef struct {
-    handle *process;
-    handle *thread;
+    handle process;
+    handle thread;
     i32 pid;
     i32 tid;
 } pi;
 
-#define W32(r) __declspec(dllimport) r __stdcall
-W32(i32)      CloseHandle(handle *);
-W32(c16 **)   CommandLineToArgvW(c16 *, i32 *);
-W32(i32)      CreateProcessW(c16*,c16*,ign,ign,i32,u32,ign,c16*,si*,pi*);
-W32(i32)      DeleteFileW(c16 *);
-W32(void)     ExitProcess(u32) __attribute((noreturn));
-W32(c16 *)    GetCommandLineW(void);
-W32(c16 *)    GetEnvironmentStringsW(void);
-W32(i32)      GetExitCodeProcess(handle *, u32 *);
-W32(handle *) GetStdHandle(u32);
-W32(byte *)   VirtualAlloc(byte *, size, u32, u32);
-W32(i32)      WaitForSingleObject(handle *, u32);
-W32(byte *)   WriteConsoleW(handle *, c16 *, u32, u32 *, ign);
-W32(byte *)   WriteFile(handle *, byte *, u32, u32 *, ign);
+#define W32 __attribute((dllimport,stdcall))
+W32 i32    CloseHandle(handle);
+W32 c16  **CommandLineToArgvW(c16 *, i32 *);
+W32 i32    CreateProcessW(c16*,c16*,null,null,i32,u32,c16*,c16*,si*,pi*);
+W32 i32    DeleteFileW(c16 *);
+W32 void   ExitProcess(u32) __attribute((noreturn));
+W32 c16   *GetCommandLineW(void);
+W32 c16   *GetEnvironmentStringsW(void);
+W32 i32    GetExitCodeProcess(handle, u32 *);
+W32 handle GetStdHandle(u32);
+W32 byte  *VirtualAlloc(byte *, size, u32, u32);
+W32 i32    WaitForSingleObject(handle, u32);
+W32 byte  *WriteConsoleW(handle, c16 *, u32, u32 *, null);
+W32 byte  *WriteFile(handle, byte *, u32, u32 *, null);
 
 typedef struct {
     byte *mem;
-    size cap;
-    size off;
-    uptr oom[5];
+    size  cap;
+    size  off;
+    uptr  oom[5];
 } arena;
 
 static arena *newarena(byte *mem, size len)
 {
-    arena *a = 0;
-    if (len >= (size)sizeof(*a)) {
-        a = (arena *)mem;
-        a->mem = mem;
-        a->cap = len;
-        a->off = sizeof(*a);
-    }
+    assert(len >= (size)sizeof(arena));
+    arena *a = (arena *)mem;
+    a->mem = mem;
+    a->cap = len;
+    a->off = sizeof(*a);
     return a;
 }
 
 #define NEW(a, n, t) (t *)alloc(a, n, sizeof(t), _Alignof(t))
-static byte *alloc(arena *a, size count, size sz, size align)
+static byte *alloc(arena *a, size count, size objsize, size align)
 {
     assert(count >= 0);
     assert(align > 0);
-    assert(sz > 0);
+    assert(objsize > 0);
     size avail = a->cap - a->off;
     size pad = -a->off & (align - 1);
-    if (count > (avail - pad)/sz) {
+    if (count > (avail - pad)/objsize) {
         __builtin_longjmp(a->oom, 1);
     }
-    size total = count * sz;
+    size total = count * objsize;
     byte *p = a->mem + a->off + pad;
     for (size i = 0; i < total; i++) {
         p[i] = 0;
@@ -217,7 +213,7 @@ typedef struct {
 
 static var parsevar(c16 *s)
 {
-    var v = {0};
+    var v = {};
     v.key = s;
     for (; v.key[v.klen] && v.key[v.klen]!='='; v.klen++) {}
     v.val = v.key + v.klen + !!v.key[v.klen];
@@ -268,7 +264,7 @@ typedef struct arglist {
 static void safewrite(i32 fd, c16 *buf, size len)
 {
     assert((size)(u32)len == len);
-    handle *h = GetStdHandle(-10 - fd);
+    handle h = GetStdHandle(-10 - fd);
     u32 dummy;
     if (!WriteConsoleW(h, buf, (u32)len, &dummy, 0)) {
         // probably redirected to a file
@@ -291,7 +287,7 @@ static u32 fatal(c16buf *err, c16 *msg, size len)
 
 static bool usage(i32 fd)
 {
-    handle *h = GetStdHandle(-10 - fd);
+    handle h = GetStdHandle(-10 - fd);
     static byte usage[] =
     "usage: f77 [OPTIONS] <FILES...>\n"
     "  -a         automatic local variables (f2c)\n"
@@ -314,10 +310,10 @@ static bool usage(i32 fd)
     return WriteFile(h, usage, sizeof(usage)-1, &dummy, 0);
 }
 
-static i32 f77main(i32 argc, c16 **argv)
+static u32 f77main(i32 argc, c16 **argv)
 {
     c16 errbuf[256];
-    c16buf err[1] = {0};
+    c16buf err[1] = {};
     err->buf = errbuf;
     err->cap = sizeof(errbuf)/2;
     APPEND(err, L"f77: fatal: ");
@@ -471,7 +467,7 @@ static i32 f77main(i32 argc, c16 **argv)
             cmd.buf[cmd.len-1] = 0;
         }
 
-        si si = {0};
+        si si = {};
         si.cb = sizeof(si);
         pi pi;
         if (!CreateProcessW(0, cmd.buf, 0, 0, 1, 0, 0, 0, &si, &pi)) {
@@ -538,6 +534,6 @@ void mainCRTStartup(void)
     c16 *cmdline = GetCommandLineW();
     i32 argc;
     c16 **argv = CommandLineToArgvW(cmdline, &argc);
-    i32 r = f77main(argc, argv);
+    u32 r = f77main(argc, argv);
     ExitProcess(r);
 }
