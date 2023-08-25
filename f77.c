@@ -5,18 +5,21 @@
 // Enable assertions with -fsanitize=undefined -fsanitize-trap
 // This is free and unencumbered software released into the public domain.
 
-#define assert(c) do if (!(c)) __builtin_unreachable(); while (0)
+#define assert(c)    do if (!(c)) __builtin_unreachable(); while (0)
+#define new(a, n, t) (t *)alloc(a, n, sizeof(t), _Alignof(t))
+#define countof(a)   (size)(sizeof(a) / sizeof(*(a)))
+#define lengthof(s)  (countof(s)-1)
+#define tupleof(s)   s, lengthof(s)
 
-typedef _Bool            bool;
-typedef unsigned char    byte;
-typedef __UINT8_TYPE__   u8;
 typedef __UINT16_TYPE__  u16;
 typedef __UINT32_TYPE__  u32;
 typedef __INT32_TYPE__   i32;
+typedef __INT32_TYPE__   b32;
+typedef unsigned char    byte;
 typedef __PTRDIFF_TYPE__ size;
 typedef __UINTPTR_TYPE__ uptr;
-typedef u16              char16_t;  // for GDB
-typedef char16_t         c16;
+typedef u16              wchar_t;  // for GDB
+typedef wchar_t          c16;
 
 typedef struct {} *handle;
 typedef struct {} *null;
@@ -48,14 +51,14 @@ W32 i32    GetExitCodeProcess(handle, u32 *);
 W32 handle GetStdHandle(u32);
 W32 byte  *VirtualAlloc(byte *, size, u32, u32);
 W32 i32    WaitForSingleObject(handle, u32);
-W32 byte  *WriteConsoleW(handle, c16 *, u32, u32 *, null);
-W32 byte  *WriteFile(handle, byte *, u32, u32 *, null);
+W32 i32    WriteConsoleW(handle, c16 *, u32, u32 *, null);
+W32 i32    WriteFile(handle, byte *, u32, u32 *, null);
 
 typedef struct {
     byte *mem;
     size  cap;
     size  off;
-    uptr  oom[5];
+    void *oom[5];
 } arena;
 
 static arena *newarena(byte *mem, size len)
@@ -68,7 +71,6 @@ static arena *newarena(byte *mem, size len)
     return a;
 }
 
-#define NEW(a, n, t) (t *)alloc(a, n, sizeof(t), _Alignof(t))
 static byte *alloc(arena *a, size count, size objsize, size align)
 {
     assert(count >= 0);
@@ -92,18 +94,17 @@ typedef struct {
     c16 *buf;
     size cap;
     size len;
-    bool err;
+    b32  err;
 } c16buf;
 
 static c16buf *newbuf(arena *a, size cap)
 {
-    c16buf *cc = NEW(a, 1, c16buf);
+    c16buf *cc = new(a, 1, c16buf);
     cc->cap = cap;
-    cc->buf = NEW(a, cap, c16);
+    cc->buf = new(a, cap, c16);
     return cc;
 }
 
-#define APPEND(dst, s) append(dst, s, sizeof(s)/2-1)
 static void append(c16buf *dst, c16 *buf, size len)
 {
     size avail = dst->cap - dst->len;
@@ -130,7 +131,7 @@ static void appendc16(c16buf *dst, c16 c)
 
 static void appendcmd(c16buf *dst, c16 *arg)
 {
-    bool simple = 1;
+    b32 simple = 1;
     for (c16 *s = arg; *s && simple; s++) {
         simple = *s!=' ' && *s!='\t';
     }
@@ -147,7 +148,7 @@ static void appendarg(c16buf *dst, c16 *arg)
 {
     appendc16(dst, ' ');
 
-    bool simple = 1;
+    b32 simple = 1;
     for (size i = 0; simple && arg[i]; i++) {
         switch (arg[i]) {
         case '\n': case ' ': case '"':
@@ -185,7 +186,7 @@ static void appendarg(c16buf *dst, c16 *arg)
     appendc16(dst, '"');
 }
 
-static bool matches(c16 *a, u8 *b)
+static b32 matches(c16 *a, c16 *b)
 {
     for (; *a && *b; a++, b++) {
         if (*a != *b) {
@@ -195,7 +196,7 @@ static bool matches(c16 *a, u8 *b)
     return *a == *b;
 }
 
-static bool begins(c16 *a, u8 *b)
+static b32 begins(c16 *a, c16 *b)
 {
     for (; *a && *b; a++, b++) {
         if (*a != *b) {
@@ -227,8 +228,7 @@ static c16 upper(c16 c)
     return c>='a' && c<='z' ? (c16)(c+'A'-'a') : c;
 }
 
-#define IMATCH(a, n, b) imatch(a, n, (u8 *)b, sizeof(b)-1)
-static bool imatch(c16 *a, size alen, u8 *b, size blen)
+static b32 imatch(c16 *a, size alen, c16 *b, size blen)
 {
     if (alen != blen) {
         return 0;
@@ -248,7 +248,7 @@ static c16 *makecpath(arena *a, c16 *fpath)
     if (len<3 || fpath[len-2]!='.' || upper(fpath[len-1])!='F') {
         return 0;
     }
-    c16 *cpath = NEW(a, len+1, c16);
+    c16 *cpath = new(a, len+1, c16);
     for (size i = 0; i < len-1; i++) {
         cpath[i] = fpath[i];
     }
@@ -276,7 +276,6 @@ static void safewrite(i32 fd, c16 *buf, size len)
     }
 }
 
-#define FATAL(err, msg) fatal(err, L##msg, sizeof(msg)-1)
 static u32 fatal(c16buf *err, c16 *msg, size len)
 {
     append(err, msg, len);
@@ -285,7 +284,7 @@ static u32 fatal(c16buf *err, c16 *msg, size len)
     return 1;
 }
 
-static bool usage(i32 fd)
+static b32 usage(i32 fd)
 {
     handle h = GetStdHandle(-10 - fd);
     static byte usage[] =
@@ -307,7 +306,7 @@ static bool usage(i32 fd)
     "  -D* -E -f* -I* -L* -l* -m* -O* -pipe -S -s -shared\n"
     "  -static -U* -v -W* -w\n";
     u32 dummy;
-    return WriteFile(h, usage, sizeof(usage)-1, &dummy, 0);
+    return WriteFile(h, usage, lengthof(usage), &dummy, 0);
 }
 
 static u32 f77main(i32 argc, c16 **argv)
@@ -315,12 +314,12 @@ static u32 f77main(i32 argc, c16 **argv)
     c16 errbuf[256];
     c16buf err[1] = {};
     err->buf = errbuf;
-    err->cap = sizeof(errbuf)/2;
-    APPEND(err, L"f77: fatal: ");
+    err->cap = lengthof(errbuf);
+    append(err, tupleof(L"f77: fatal: "));
 
     arena *perm = newarena(VirtualAlloc(0, 1<<24, 0x3000, 4), 1<<21);
     if (!perm || __builtin_setjmp(perm->oom)) {
-        return FATAL(err, "out of memory");
+        return fatal(err, tupleof(L"out of memory"));
     }
 
     arglist *inputs  = 0, **lastinput  = &inputs;
@@ -332,9 +331,9 @@ static u32 f77main(i32 argc, c16 **argv)
     c16 *env = GetEnvironmentStringsW();
     while (*env) {
         var v = parsevar(env);
-        if (IMATCH(v.key, v.klen, "F2C")) {
+        if (imatch(v.key, v.klen, tupleof(L"F2C"))) {
             cmd_f2c = v.val;
-        } else if (IMATCH(v.key, v.klen, "CC")) {
+        } else if (imatch(v.key, v.klen, tupleof(L"CC"))) {
             cmd_cc = v.val;
         }
         env = v.next;
@@ -344,105 +343,105 @@ static u32 f77main(i32 argc, c16 **argv)
     c16buf *cc = newbuf(perm, 1<<14);
     appendcmd(cc, cmd_cc);
 
-    bool dolink = 1;
-    bool keep = 0;
-    bool verbose = 0;
-    bool stopargs = 0;
+    b32 dolink = 1;
+    b32 keep = 0;
+    b32 verbose = 0;
+    b32 stopargs = 0;
 
     i32 optind = 1;
     for (; optind < argc; optind++) {
         c16 *arg = argv[optind];
         if (stopargs || *arg != '-') {
-            arglist *input = NEW(perm, 1, arglist);
+            arglist *input = new(perm, 1, arglist);
             input->arg = arg;
             *lastinput = input;
             lastinput = &input->next;
-        } else if (matches(arg, (u8 *)"--")) {
+        } else if (matches(arg, L"--")) {
             stopargs = 1;
-        } else if (begins(arg, (u8 *)"-C")) {
+        } else if (begins(arg, L"-C")) {
             appendarg(f2c, arg);
-        } else if (begins(arg, (u8 *)"-D")) {
+        } else if (begins(arg, L"-D")) {
             appendarg(cc, arg);
-        } else if (matches(arg, (u8 *)"-E")) {
+        } else if (matches(arg, L"-E")) {
             appendarg(cc, arg);
-        } else if (begins(arg, (u8 *)"-I")) {
+        } else if (begins(arg, L"-I")) {
             appendarg(cc, arg);
-        } else if (begins(arg, (u8 *)"-L")) {
+        } else if (begins(arg, L"-L")) {
             appendarg(cc, arg);
-        } else if (begins(arg, (u8 *)"-O")) {
+        } else if (begins(arg, L"-O")) {
             appendarg(cc, arg);
-        } else if (matches(arg, (u8 *)"-S")) {
+        } else if (matches(arg, L"-S")) {
             appendarg(cc, arg);
-        } else if (begins(arg, (u8 *)"-U")) {
+        } else if (begins(arg, L"-U")) {
             appendarg(cc, arg);
-        } else if (begins(arg, (u8 *)"-W")) {
+        } else if (begins(arg, L"-W")) {
             appendarg(cc, arg);
-        } else if (begins(arg, (u8 *)"-Xf2c")) {
+        } else if (begins(arg, L"-Xf2c")) {
             if (++optind == argc) {
-                return FATAL(err, "missing filename after '-Xf2c'");
+                return fatal(err, tupleof(L"missing filename after '-Xf2c'"));
             }
             appendarg(f2c, argv[optind]);
-        } else if (matches(arg, (u8 *)"-a")) {
+        } else if (matches(arg, L"-a")) {
             appendarg(f2c, arg);
-        } else if (matches(arg, (u8 *)"-c")) {
+        } else if (matches(arg, L"-c")) {
             dolink = 0;
             appendarg(cc, arg);
-        } else if (begins(arg, (u8 *)"-f")) {
+        } else if (begins(arg, L"-f")) {
             appendarg(cc, arg);
-        } else if (matches(arg, (u8 *)"-g")) {
+        } else if (matches(arg, L"-g")) {
             appendarg(cc, L"-g3");
             appendarg(f2c, arg);
-        } else if (matches(arg, (u8 *)"--help")) {
+        } else if (matches(arg, L"--help")) {
             return !usage(1);
-        } else if (matches(arg, (u8 *)"-k")) {
+        } else if (matches(arg, L"-k")) {
             keep = 1;
-        } else if (begins(arg, (u8 *)"-l")) {
-            arglist *lib = NEW(perm, 1, arglist);
+        } else if (begins(arg, L"-l")) {
+            arglist *lib = new(perm, 1, arglist);
             lib->arg = arg;
             *lastlib = lib;
             lastlib = &lib->next;
-        } else if (begins(arg, (u8 *)"-m")) {
+        } else if (begins(arg, L"-m")) {
             appendarg(cc, arg);
-        } else if (matches(arg, (u8 *)"-pipe")) {
+        } else if (matches(arg, L"-pipe")) {
             appendarg(cc, arg);
-        } else if (begins(arg, (u8 *)"-o")) {
+        } else if (begins(arg, L"-o")) {
             appendarg(cc, arg);
             if (!arg[2]) {
                 if (++optind == argc) {
-                    return FATAL(err, "missing filename after '-o'");
+                    return fatal(err, tupleof(L"missing filename after '-o'"));
                 }
                 appendarg(cc, argv[optind]);
             }
-        } else if (matches(arg, (u8 *)"-s")) {
+        } else if (matches(arg, L"-s")) {
             appendarg(cc, arg);
-        } else if (matches(arg, (u8 *)"-shared")) {
+        } else if (matches(arg, L"-shared")) {
             appendarg(cc, arg);
-        } else if (matches(arg, (u8 *)"-static")) {
+        } else if (matches(arg, L"-static")) {
             appendarg(cc, arg);
-        } else if (matches(arg, (u8 *)"-trapuv")) {
+        } else if (matches(arg, L"-trapuv")) {
             appendarg(f2c, arg);
-        } else if (matches(arg, (u8 *)"-v")) {
+        } else if (matches(arg, L"-v")) {
             appendarg(cc, arg);
-        } else if (matches(arg, (u8 *)"-w")) {
+        } else if (matches(arg, L"-w")) {
             appendarg(cc, arg);
             appendarg(f2c, arg);
-        } else if (matches(arg, (u8 *)"-x")) {
+        } else if (matches(arg, L"-x")) {
             verbose = 1;
         } else {
             usage(2);
-            APPEND(err, L"unknown option: ");
+            append(err, tupleof(L"unknown option: "));
             appendstr(err, arg);
-            return FATAL(err, "");
+            return fatal(err, 0, 0);
         }
     }
 
     if (!inputs) {
-        return FATAL(err, "no input files");
+        return fatal(err, tupleof(L"no input files"));
     }
 
     // Finally append -lf2c. -lm would go last, but Mingw-w64 does not
     // have a separate math library.
-    *lastlib = NEW(perm, 1, arglist);
+    *lastlib = new(perm, 1, arglist);
     (*lastlib)->arg = L"-lf2c";
 
     u32 status = 0;
@@ -458,7 +457,7 @@ static u32 f77main(i32 argc, c16 **argv)
         appendarg(&cmd, arg);
         appendc16(&cmd, 0);
         if (cmd.err) {
-            status = FATAL(err, "f2c command too long");
+            status = fatal(err, tupleof(L"f2c command too long"));
             break;
         }
         if (verbose) {
@@ -471,7 +470,7 @@ static u32 f77main(i32 argc, c16 **argv)
         si.cb = sizeof(si);
         pi pi;
         if (!CreateProcessW(0, cmd.buf, 0, 0, 1, 0, 0, 0, &si, &pi)) {
-            status = FATAL(err, "could not exec f2c");
+            status = fatal(err, tupleof(L"could not exec f2c"));
             break;
         }
         WaitForSingleObject(pi.process, -1);
@@ -483,7 +482,7 @@ static u32 f77main(i32 argc, c16 **argv)
         }
 
         appendarg(cc, cpath);
-        arglist *output = NEW(perm, 1, arglist);
+        arglist *output = new(perm, 1, arglist);
         output->arg = cpath;
         *lastoutput = output;
         lastoutput = &output->next;
@@ -497,7 +496,7 @@ static u32 f77main(i32 argc, c16 **argv)
         }
         appendc16(cc, 0);
         if (cc->err) {
-            status = FATAL(err, "cc command too long");
+            status = fatal(err, tupleof(L"cc command too long"));
             break;
         }
         if (verbose) {
@@ -506,7 +505,7 @@ static u32 f77main(i32 argc, c16 **argv)
             cc->buf[cc->len-1] = 0;
         }
 
-        si si = {0};
+        si si = {};
         si.cb = sizeof(si);
         pi pi;
         if (CreateProcessW(0, cc->buf, 0, 0, 1, 0, 0, 0, &si, &pi)) {
@@ -515,7 +514,7 @@ static u32 f77main(i32 argc, c16 **argv)
             CloseHandle(pi.thread);
             CloseHandle(pi.process);
         } else {
-            status = FATAL(err, "could not exec cc");
+            status = fatal(err, tupleof(L"could not exec cc"));
         }
         break;
     }

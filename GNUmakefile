@@ -1,6 +1,6 @@
 CC      = gcc
 AR      = ar
-CFLAGS  = -O2 -g
+CFLAGS  = -O2
 LDFLAGS = -s
 
 all: f2c.exe libf2c.a f2c.h f77.exe f2c.c libf2c.c
