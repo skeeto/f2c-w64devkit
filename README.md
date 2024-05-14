@@ -2,9 +2,9 @@
 
 The main feature is the GNUmakefile in the repository root. The rest of
 the source tree is lightly modified [f2c][]. The `install` target builds
-and installs `f2c.exe`, `libf2c.a`, and `f2c.h` into w64devkit. It's then
-available to compile [FORTRAN 77][] programs without the "fortran"
-w64devkit variant.
+and installs `f2c.exe`, `libf2c.a`, `f2c.h`, and `f77.exe` into w64devkit.
+It's then available to compile [FORTRAN 77][] programs without the
+"fortran" w64devkit variant.
 
     $ make -j install
 
